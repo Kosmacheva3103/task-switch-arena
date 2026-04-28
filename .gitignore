@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# База данных
+*.db
+*.sqlite
+
+# Миграции Drizzle (генерируются)
+drizzle/meta/
+
+# Переменные окружения
+.env
+.env.local
+.env.production.local
+
+# Покрытие тестов
+coverage/
