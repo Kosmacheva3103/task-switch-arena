@@ -1,4 +1,5 @@
 import { createServer } from 'http';
+import 'dotenv/config';
 import { parse } from 'url';
 import next from 'next';
 import { Server as SocketIOServer } from 'socket.io';
@@ -9,12 +10,10 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = 3000;
 
-// Подготовка Next.js
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
-  // Создание HTTP сервера
   const httpServer = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url!, true);
@@ -26,7 +25,6 @@ app.prepare().then(() => {
     }
   });
 
-  // Настройка Socket.io
   const io = new SocketIOServer(httpServer, {
     cors: {
       origin: '*',
@@ -39,6 +37,7 @@ app.prepare().then(() => {
 
     // Присоединение к матчу
     socket.on('join_match', (data: { matchId: string; playerId: string; playerName: string }) => {
+      console.log('📥 Получен join_match:', data);
       const { matchId, playerId, playerName } = data;
 
       socket.join(`match:${matchId}`);
@@ -46,8 +45,8 @@ app.prepare().then(() => {
       socket.data.playerId = playerId;
       socket.data.playerName = playerName;
 
-      // Добавляем игрока в матч
-      matchManager.addPlayer(matchId, {
+      // Пытаемся добавить игрока
+      let added = matchManager.addPlayer(matchId, {
         id: playerId,
         name: playerName,
         rating: 1000,
@@ -56,16 +55,37 @@ app.prepare().then(() => {
         errors: 0,
       });
 
+      // Если матч не существует — создаём
+      if (!added) {
+        console.log('Создаём новый матч:', matchId);
+        matchManager.createMatchById(matchId);
+        added = matchManager.addPlayer(matchId, {
+          id: playerId,
+          name: playerName,
+          rating: 1000,
+          isBot: false,
+          individualScore: 0,
+          errors: 0,
+        });
+      }
+
+      console.log('Добавлен игрок?', added);
+
+      // Отправляем обновлённый список всем в комнате
       const match = matchManager.getMatch(matchId);
       if (match) {
-        const totalPlayers =
-          match.teams[0].players.length + match.teams[1].players.length;
+        const allPlayers = [
+          ...match.teams[0].players.map(p => p.name),
+          ...match.teams[1].players.map(p => p.name),
+        ];
+        const totalPlayers = allPlayers.length;
 
         io.to(`match:${matchId}`).emit('player_joined', {
           playerId,
           playerName,
           playerCount: totalPlayers,
           maxPlayers: 6,
+          allPlayers,
         });
 
         console.log(`${playerName} присоединился к матчу ${matchId} (${totalPlayers}/6)`);
@@ -92,33 +112,24 @@ app.prepare().then(() => {
           countdown: 3,
         });
 
-        // Запуск игрового цикла
         startGameLoop(matchId, io);
       }
     });
 
     // Ответ игрока
-    socket.on(
-      'submit_answer',
-      (data: { matchId: string; answer: boolean; responseTimeMs: number }) => {
-        const { matchId, answer, responseTimeMs } = data;
-        const playerId = socket.data.playerId;
+    socket.on('submit_answer', (data: { matchId: string; answer: boolean; responseTimeMs: number }) => {
+      const { matchId, answer, responseTimeMs } = data;
+      const playerId = socket.data.playerId;
 
-        const result = matchManager.submitAnswer(
-          matchId,
-          playerId,
-          answer,
-          responseTimeMs
-        );
+      const result = matchManager.submitAnswer(matchId, playerId, answer, responseTimeMs);
 
-        socket.emit('answer_result', {
-          accepted: result.accepted,
-          correct: result.correct,
-          points: result.points,
-          message: result.message,
-        });
-      }
-    );
+      socket.emit('answer_result', {
+        accepted: result.accepted,
+        correct: result.correct,
+        points: result.points,
+        message: result.message,
+      });
+    });
 
     // Отключение
     socket.on('disconnect', () => {
@@ -134,7 +145,6 @@ app.prepare().then(() => {
     });
   });
 
-  // Запуск сервера
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> Socket.io готов к подключениям`);
@@ -151,7 +161,6 @@ function startGameLoop(matchId: string, io: SocketIOServer) {
     if (!match) return;
 
     roundNumber = match.roundNumber;
-
     const duration = 5000 + Math.floor(Math.random() * 10000);
 
     io.to(`match:${matchId}`).emit('rule_changed', {
@@ -164,10 +173,8 @@ function startGameLoop(matchId: string, io: SocketIOServer) {
       buttons: getButtons(match.currentRule as Rule),
     });
 
-    // Обработка ответов ботов
     processBotAnswers(matchId, io);
 
-    // Таймер на конец раунда
     setTimeout(() => {
       const currentMatch = matchManager.getMatch(matchId);
       if (!currentMatch || currentMatch.status !== 'active') return;
@@ -183,12 +190,11 @@ function startGameLoop(matchId: string, io: SocketIOServer) {
       if (roundNumber >= maxRounds) {
         endGame(matchId, io);
       } else {
-        setTimeout(runRound, 2000); // Пауза 2 секунды между раундами
+        setTimeout(runRound, 2000);
       }
     }, duration);
   };
 
-  // Первый раунд через 3 секунды после старта
   setTimeout(runRound, 3000);
 }
 
@@ -203,12 +209,7 @@ function processBotAnswers(matchId: string, io: SocketIOServer) {
         const botAnswer = matchManager.getBotAnswer(matchId, player.id);
         if (botAnswer) {
           setTimeout(() => {
-            matchManager.submitAnswer(
-              matchId,
-              player.id,
-              botAnswer.answer,
-              botAnswer.delay
-            );
+            matchManager.submitAnswer(matchId, player.id, botAnswer.answer, botAnswer.delay);
           }, botAnswer.delay);
         }
       }
@@ -240,7 +241,6 @@ function endGame(matchId: string, io: SocketIOServer) {
   });
 }
 
-// Вспомогательные функции
 function getRuleName(rule: Rule): string {
   const names: Record<Rule, string> = {
     EVEN_ODD: 'Чётное?',

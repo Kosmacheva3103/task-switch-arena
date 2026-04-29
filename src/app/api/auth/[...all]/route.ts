@@ -1,7 +1,4 @@
-export async function GET() {
-  return Response.json({ message: 'Auth endpoint' });
-}
+import { auth } from '@/server/auth';
 
-export async function POST() {
-  return Response.json({ message: 'Auth endpoint' });
-}
+export const GET = auth.handler;
+export const POST = auth.handler;

@@ -56,7 +56,28 @@ class MatchManager {
     
     return { matchId, inviteCode };
   }
+  createMatchById(matchId: string): GameState {
+  const initialState: GameState = {
+    matchId,
+    status: 'waiting',
+    currentRule: null,
+    currentSymbol: null,
+    roundNumber: 0,
+    maxRounds: 15,
+    teams: [
+      { id: 'team_a', name: 'Команда А', players: [], totalScore: 0 },
+      { id: 'team_b', name: 'Команда Б', players: [], totalScore: 0 },
+    ],
+    timeRemaining: 0,
+    roundResults: [],
+    createdAt: new Date().toISOString(),
+  };
 
+  this.matches.set(matchId, initialState);
+  this.roundAnswers.set(matchId, new Map());
+
+  return initialState;
+}
   /**
    * Получение состояния матча
    */

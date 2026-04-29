@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { nanoid } from 'nanoid';
 import { connectSocket, getSocket } from '@/lib/socket';
@@ -11,86 +11,122 @@ export default function LobbyPage() {
   const router = useRouter();
   const [matchId, setMatchId] = useState('');
   const [playerName, setPlayerName] = useState('');
-  const [code, setCode] = useState('');
+  const [joinCode, setJoinCode] = useState('');
   const [createdCode, setCreatedCode] = useState('');
   const [players, setPlayers] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState<'select' | 'create' | 'join' | 'waiting'>('select');
 
-  // Создание комнаты
+  useEffect(() => {
+    const socket = connectSocket();
+
+    socket.on('connect', () => {
+      console.log('✅ Подключен! ID:', socket.id);
+    });
+
+    socket.on('player_joined', (data: any) => {
+      console.log('📥 player_joined:', data);
+      if (data.allPlayers) {
+        setPlayers(data.allPlayers);
+      }
+    });
+     socket.on('match_started', (data: any) => {
+    console.log('Матч начинается! Переходим...');
+    router.push(`/game/${matchId}`);
+  });
+
+    socket.on('disconnect', () => {
+      console.log('Отключен');
+    });
+
+    return () => {
+      socket.off('connect');
+      socket.off('player_joined');
+      socket.off('match_started');
+      socket.off('disconnect');
+    };
+  }, [matchId, router]);
+
   const createRoom = () => {
     if (!playerName.trim()) {
       setError('Введите имя');
       return;
     }
 
-    const newMatchId = nanoid(12);
-    const inviteCode = nanoid(6).toUpperCase();
+    const roomCode = nanoid(8).toUpperCase();
     const playerId = nanoid();
 
-    setMatchId(newMatchId);
-    setCreatedCode(inviteCode);
+    setMatchId(roomCode);
+    setCreatedCode(roomCode);
+    setMode('waiting');
 
-    // Сохраняем данные
     localStorage.setItem('playerId', playerId);
     localStorage.setItem('playerName', playerName);
-    localStorage.setItem('matchId', newMatchId);
+    localStorage.setItem('matchId', roomCode);
 
-    // Подключаемся к Socket.io
-    const socket = connectSocket();
-    socket.emit('join_match', { matchId: newMatchId, playerId, playerName });
-
-    // Слушаем присоединения
-    socket.on('player_joined', (data) => {
-      setPlayers((prev) => [...prev, data.playerName]);
+    const socket = getSocket();
+    socket.emit('join_match', {
+      matchId: roomCode,
+      playerId,
+      playerName,
     });
 
     setPlayers([playerName]);
   };
 
-  // Присоединение к комнате
   const joinRoom = () => {
-    if (!playerName.trim() || !code.trim()) {
+    if (!playerName.trim() || !joinCode.trim()) {
       setError('Введите имя и код комнаты');
       return;
     }
 
     const playerId = nanoid();
+
     localStorage.setItem('playerId', playerId);
     localStorage.setItem('playerName', playerName);
-    localStorage.setItem('matchId', code);
+    localStorage.setItem('matchId', joinCode);
 
-    const socket = connectSocket();
-    socket.emit('join_match', { matchId: code, playerId, playerName });
+    setMatchId(joinCode);
+    setMode('waiting');
 
-    socket.on('player_joined', (data) => {
-      setPlayers((prev) => [...prev, data.playerName]);
+    const socket = getSocket();
+    socket.emit('join_match', {
+      matchId: joinCode,
+      playerId,
+      playerName,
     });
 
-    setMatchId(code);
     setPlayers([playerName]);
   };
 
-  // Начать игру
   const startGame = () => {
     const socket = getSocket();
     socket.emit('start_match', { matchId });
     router.push(`/game/${matchId}`);
   };
 
+  const copyCode = () => {
+    const code = createdCode || matchId;
+    navigator.clipboard.writeText(code);
+    alert('Код скопирован!');
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 p-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-white mb-8 text-center">
-          🎮 Лобби
-        </h1>
+        <h1 className="text-4xl font-bold text-white mb-8 text-center">🎮 Лобби</h1>
 
         {error && (
-          <div className="bg-red-500/20 text-white p-4 rounded-xl mb-4">{error}</div>
+          <div
+            className="bg-red-500/20 text-white p-4 rounded-xl mb-4 cursor-pointer"
+            onClick={() => setError('')}
+          >
+            {error} (нажмите чтобы скрыть)
+          </div>
         )}
 
-        {!matchId ? (
+        {mode === 'select' && (
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Создать комнату */}
             <Card>
               <h2 className="text-2xl font-bold mb-4">Создать комнату</h2>
               <input
@@ -105,7 +141,6 @@ export default function LobbyPage() {
               </Button>
             </Card>
 
-            {/* Присоединиться */}
             <Card>
               <h2 className="text-2xl font-bold mb-4">Присоединиться</h2>
               <input
@@ -117,8 +152,8 @@ export default function LobbyPage() {
               />
               <input
                 type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="Код комнаты"
                 className="w-full bg-gray-100 px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
@@ -127,21 +162,24 @@ export default function LobbyPage() {
               </Button>
             </Card>
           </div>
-        ) : (
-          <Card className="text-center">
-            {createdCode && (
-              <div className="mb-6">
-                <p className="text-gray-500 mb-2">Код комнаты:</p>
-                <p className="text-5xl font-mono font-bold text-indigo-500 tracking-widest">
-                  {createdCode}
-                </p>
-                <p className="text-gray-400 mt-2">Отправьте этот код друзьям</p>
-              </div>
-            )}
+        )}
 
-            <h3 className="text-xl font-bold mb-4">
-              Игроки ({players.length}/6)
-            </h3>
+        {mode === 'waiting' && (
+          <Card className="text-center">
+            <h2 className="text-2xl font-bold mb-4">Ожидание игроков</h2>
+
+            <div className="mb-6">
+              <p className="text-gray-500 mb-2">Код комнаты:</p>
+              <p
+                className="text-5xl font-mono font-bold text-indigo-500 tracking-widest cursor-pointer hover:bg-indigo-50 rounded-xl py-2"
+                onClick={copyCode}
+              >
+                {createdCode || matchId}
+              </p>
+              <p className="text-gray-400 mt-2 text-sm">Нажмите на код, чтобы скопировать</p>
+            </div>
+
+            <h3 className="text-xl font-bold mb-4">Игроки ({players.length}/6)</h3>
             <div className="space-y-2 mb-6">
               {players.map((name, i) => (
                 <div
@@ -156,8 +194,8 @@ export default function LobbyPage() {
               )}
             </div>
 
-            <Button onClick={startGame} disabled={players.length < 2} size="lg">
-              {players.length < 2 ? 'Минимум 2 игрока' : 'Начать игру'}
+            <Button onClick={startGame} size="lg" className="w-full">
+              Начать игру ({players.length} игроков)
             </Button>
           </Card>
         )}

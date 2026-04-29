@@ -1,12 +1,11 @@
-// Заглушка аутентификации (будет заменена на Better-auth)
-export const auth = {
-  api: {
-    getSession: async () => ({
-      user: {
-        id: 'dev-user-1',
-        name: 'Разработчик',
-        email: 'dev@example.com',
-      },
-    }),
+import { betterAuth } from 'better-auth';
+import Database from 'better-sqlite3';
+
+const sqlite = new Database('auth.db');
+
+export const auth = betterAuth({
+  database: sqlite,
+  emailAndPassword: {
+    enabled: true,
   },
-};
+});
