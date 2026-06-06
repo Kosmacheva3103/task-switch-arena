@@ -19,7 +19,6 @@ export function initSocketServer(httpServer: HTTPServer) {
   });
 
   io.on('connection', (socket) => {
-    console.log('Игрок подключился:', socket.id);
 
     // Присоединение к матчу
     socket.on('join_match', (data: { matchId: string; playerId: string; playerName: string }) => {
@@ -41,8 +40,6 @@ export function initSocketServer(httpServer: HTTPServer) {
           maxPlayers: 6,
         });
       }
-
-      console.log(`${playerName} присоединился к матчу ${matchId}`);
     });
 
     // Запуск матча
@@ -93,7 +90,6 @@ export function initSocketServer(httpServer: HTTPServer) {
 
     // Отключение
     socket.on('disconnect', () => {
-      console.log('Игрок отключился:', socket.id);
       const matchId = socket.data.matchId;
       if (matchId) {
         io?.to(`match:${matchId}`).emit('player_left', {

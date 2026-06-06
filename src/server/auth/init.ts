@@ -50,6 +50,4 @@ db.exec(`
     updatedAt TEXT DEFAULT (datetime('now')) NOT NULL
   );
 `);
-
-console.log('✅ Все таблицы созданы (полная схема)');
 db.close();

@@ -20,24 +20,15 @@ export default function LobbyPage() {
   useEffect(() => {
     const socket = connectSocket();
 
-    socket.on('connect', () => {
-      console.log('✅ Подключен! ID:', socket.id);
-    });
-
     socket.on('player_joined', (data: any) => {
-      console.log('📥 player_joined:', data);
       if (data.allPlayers) {
         setPlayers(data.allPlayers);
       }
     });
      socket.on('match_started', (data: any) => {
-    console.log('Матч начинается! Переходим...');
     router.push(`/game/${matchId}`);
   });
 
-    socket.on('disconnect', () => {
-      console.log('Отключен');
-    });
 
     return () => {
       socket.off('connect');

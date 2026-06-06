@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧠 TaskSwitch Arena
 
-## Getting Started
+Командный тренажёр переключения задач — многопользовательская real-time игра для тренировки когнитивной гибкости.
 
-First, run the development server:
+## 📋 Описание
+
+Игроки делятся на 2 команды и классифицируют символы по меняющимся правилам. Правила меняются синхронно для всех участников каждые 5-15 секунд. Побеждает команда с наибольшим счётом.
+
+## 🚀 Быстрый старт
+
+### Требования
+- Node.js 18+
+- PostgreSQL 14+
+
+### Установка
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/kosmacheva3103/task-switch-arena.git
+cd task-switch-arena
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Настройка
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Скопируйте `.env.example` в `.env`
+2. Заполните `DATABASE_URL` (подключение к PostgreSQL)
+3. Сгенерируйте `BETTER_AUTH_SECRET`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
-## Learn More
+### Запуск
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Разработка
+npm run dev
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Тесты
+npm test
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Приложение: http://localhost:3000
 
-## Deploy on Vercel
+## 🎮 Как играть
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Откройте приложение и зарегистрируйтесь
+2. Создайте комнату или присоединитесь по коду
+3. Дождитесь игроков и нажмите «Начать игру»
+4. Отвечайте на вопросы, нажимая кнопки ДА/НЕТ
+5. После 15 раундов увидите результаты
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📖 Правила
+
+| Правило | Символы | Вопрос |
+|---------|---------|--------|
+| Чёт/нечет | 0-9 | Чётное число? |
+| Гласные/согласные | a-z | Гласная буква? |
+| Кратные 3 | 0-99 | Делится на 3? |
+
+Подробнее: [docs/GAME_RULES.md](docs/GAME_RULES.md)
+
+## 🏗️ Технологический стек
+
+| Технология | Назначение |
+|------------|------------|
+| TypeScript | Язык программирования |
+| Next.js 14 | Веб-фреймворк |
+| Drizzle ORM | Работа с PostgreSQL |
+| tRPC | Типизированное API |
+| Better-auth | Аутентификация |
+| Socket.io | Real-time коммуникация |
+| Vitest | Тестирование |
+| Tailwind CSS | Стилизация |
+
+## 📁 Структура проекта
+
+```
+src/
+├── app/           # Страницы (лобби, игра, результаты)
+├── server/
+│   ├── game/      # Игровой движок
+│   ├── api/       # tRPC роутеры
+│   ├── db/        # Drizzle схема
+│   └── auth/      # Better-auth
+├── components/    # UI компоненты
+└── __tests__/     # Unit-тесты (30 шт.)
+```
+
+## 📚 Документация
+
+- [API документация](docs/API.md)
+- [Архитектура](docs/ARCHITECTURE.md)
+- [Правила игры](docs/GAME_RULES.md)
+- [Тестирование](docs/TESTING.md)
+- [Использование ИИ-агента](docs/AGENT_USAGE.md)
+
+## 🧪 Тесты
+
+```bash
+npm test
+```
+
+Результат: 30 тестов пройдены ✅

@@ -44,14 +44,12 @@ export default function GamePage() {
     .catch(() => {});
 
   socket.on('match_started', (data: any) => {
-    console.log('Игра началась!', data);
     setTeamA(data.teams[0]);
     setTeamB(data.teams[1]);
     setGameStarted(true);
   });
 
   socket.on('game_state', (data: any) => {
-    console.log('Текущее состояние игры:', data);
     setTeamA(data.teams[0]);
     setTeamB(data.teams[1]);
     setScoreA(data.scores.teamA);
@@ -59,14 +57,12 @@ export default function GamePage() {
     setGameStarted(true);
   });
     socket.on('match_started', (data: any) => {
-      console.log('Игра началась!', data);
       setTeamA(data.teams[0]);
       setTeamB(data.teams[1]);
       setGameStarted(true);
     });
 
     socket.on('rule_changed', (data: GameData) => {
-      console.log('Новый раунд:', data);
       setGameData(data);
       setAnswered(false);
       setAnswerResult('');
