@@ -1,12 +1,17 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { auth } from '../auth';
+import { headers } from 'next/headers';
 
-// Контекст tRPC (пока пустой, позже добавим сессии)
 export const createTRPCContext = async () => {
-  return {};
+  const headersList = await headers();
+  const session = await auth.api.getSession({
+    headers: headersList,
+  });
+
+  return { session };
 };
 
-// Инициализация tRPC
 const t = initTRPC.context<typeof createTRPCContext>().create({
   errorFormatter({ shape, error }) {
     return {
@@ -19,15 +24,23 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
   },
 });
 
-// Публичная процедура (доступна без авторизации)
 export const publicProcedure = t.procedure;
 
-// Защищённая процедура (только для авторизованных)
 export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
-  // Пока пропускаем всех, позже добавим проверку сессии
-  return next({ ctx: { ...ctx } });
+  if (!ctx.session) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Необходима авторизация',
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.session.user,
+    },
+  });
 });
 
-// Экспорт роутера
 export const router = t.router;
 export const middleware = t.middleware;

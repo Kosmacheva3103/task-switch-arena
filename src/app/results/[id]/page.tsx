@@ -1,22 +1,53 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { getSocket, connectSocket } from '@/lib/socket';
 import { useRouter } from 'next/navigation';
+import { connectSocket } from '@/lib/socket';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 
+interface PlayerResult {
+  name: string;
+  individualScore: number;
+  errors: number;
+}
+
+interface TeamResult {
+  name: string;
+  players: PlayerResult[];
+}
+
+interface MatchEndedData {
+  winner: { id: string; name: string } | null;
+  isDraw: boolean;
+  finalScores: {
+    teamA: number;
+    teamB: number;
+  };
+  teams: TeamResult[];
+}
+
+function getSavedResults(): MatchEndedData | null {
+  if (typeof window === 'undefined') return null;
+  const saved = localStorage.getItem('lastMatchResults');
+  if (!saved) return null;
+  try {
+    return JSON.parse(saved) as MatchEndedData;
+  } catch {
+    return null;
+  }
+}
+
 export default function ResultsPage() {
-  const params = useParams();
   const router = useRouter();
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<MatchEndedData | null>(getSavedResults);
 
   useEffect(() => {
     const socket = connectSocket();
 
-    socket.on('match_ended', (data) => {
+    socket.on('match_ended', (data: MatchEndedData) => {
       setResults(data);
+      localStorage.setItem('lastMatchResults', JSON.stringify(data));
     });
 
     return () => {
@@ -42,16 +73,14 @@ export default function ResultsPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {results.teams?.map((team: any, i: number) => (
+          {results.teams?.map((team, i) => (
             <Card key={i}>
-              <h3 className="text-xl font-bold text-center mb-4">
-                {team.name}
-              </h3>
+              <h3 className="text-xl font-bold text-center mb-4">{team.name}</h3>
               <p className="text-4xl font-bold text-center text-indigo-500 mb-4">
-                {results.finalScores[`team${i === 0 ? 'A' : 'B'}`]}
+                {results.finalScores[`team${i === 0 ? 'A' : 'B'}` as keyof typeof results.finalScores]}
               </p>
               <div className="space-y-2">
-                {team.players.map((player: any, j: number) => (
+                {team.players.map((player, j) => (
                   <div
                     key={j}
                     className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg"

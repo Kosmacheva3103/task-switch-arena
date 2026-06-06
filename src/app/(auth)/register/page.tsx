@@ -29,8 +29,8 @@ export default function RegisterPage() {
       } else {
         router.push('/login');
       }
-    } catch (err: any) {
-      setError(err.message || 'Ошибка');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка');
     } finally {
       setLoading(false);
     }

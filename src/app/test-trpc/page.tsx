@@ -30,8 +30,14 @@ export default function TestTRPCPage() {
         >
           Создать матч
         </button>
+        <button
+          onClick={testGetMatch}
+          className="bg-green-500 text-white px-4 py-2 rounded"
+        >
+          Получить матч
+        </button>
       </div>
-      <pre className="bg-gray-100 p-4 rounded">{result || 'Нажми кнопку...'}</pre>
+      <pre className="bg-gray-100 p-4 rounded">{result || 'Нажмите кнопку...'}</pre>
     </div>
   );
 }

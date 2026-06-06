@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { connectSocket, getSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket, getSocket } from '@/lib/socket';
 import Button from '@/components/ui/Button';
 import Timer from '@/components/ui/Timer';
 
@@ -16,14 +16,62 @@ interface GameData {
   buttons: [string, string];
 }
 
+interface TeamData {
+  id: string;
+  name: string;
+  players: {
+    id: string;
+    name: string;
+    rating: number;
+    isBot: boolean;
+  }[];
+}
+
+interface MatchStartedData {
+  teams: [TeamData, TeamData];
+  countdown: number;
+}
+
+interface AnswerResultData {
+  accepted: boolean;
+  correct: boolean;
+  points: number;
+  message?: string;
+}
+
+interface RoundResultData {
+  roundNumber: number;
+  teamScores: {
+    teamA: number;
+    teamB: number;
+  };
+}
+
+interface MatchEndedData {
+  winner: { id: string; name: string } | null;
+  isDraw: boolean;
+  finalScores: {
+    teamA: number;
+    teamB: number;
+  };
+  teams: {
+    name: string;
+    players: {
+      name: string;
+      individualScore: number;
+      errors: number;
+    }[];
+  }[];
+}
+
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
   const matchId = params.id as string;
 
   const [gameData, setGameData] = useState<GameData | null>(null);
-  const [teamA, setTeamA] = useState<any>(null);
-  const [teamB, setTeamB] = useState<any>(null);
+  const [teamA, setTeamA] = useState<TeamData | null>(null);
+  const [teamB, setTeamB] = useState<TeamData | null>(null);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [answered, setAnswered] = useState(false);
@@ -32,31 +80,8 @@ export default function GamePage() {
 
   useEffect(() => {
     const socket = connectSocket();
-    fetch(`/api/match/${matchId}`)
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === 'active') {
-        setGameStarted(true);
-        // Запрашиваем у сервера текущее состояние
-        socket.emit('request_game_state', { matchId });
-      }
-    })
-    .catch(() => {});
 
-  socket.on('match_started', (data: any) => {
-    setTeamA(data.teams[0]);
-    setTeamB(data.teams[1]);
-    setGameStarted(true);
-  });
-
-  socket.on('game_state', (data: any) => {
-    setTeamA(data.teams[0]);
-    setTeamB(data.teams[1]);
-    setScoreA(data.scores.teamA);
-    setScoreB(data.scores.teamB);
-    setGameStarted(true);
-  });
-    socket.on('match_started', (data: any) => {
+    socket.on('match_started', (data: MatchStartedData) => {
       setTeamA(data.teams[0]);
       setTeamB(data.teams[1]);
       setGameStarted(true);
@@ -69,16 +94,17 @@ export default function GamePage() {
       setGameStarted(true);
     });
 
-    socket.on('answer_result', (data: any) => {
+    socket.on('answer_result', (data: AnswerResultData) => {
       setAnswerResult(data.correct ? `✅ +${data.points} очков` : '❌ 0 очков');
     });
 
-    socket.on('round_result', (data: any) => {
+    socket.on('round_result', (data: RoundResultData) => {
       setScoreA(data.teamScores.teamA);
       setScoreB(data.teamScores.teamB);
     });
 
-    socket.on('match_ended', (data: any) => {
+    socket.on('match_ended', (data: MatchEndedData) => {
+      localStorage.setItem('lastMatchResults', JSON.stringify(data));
       router.push(`/results/${matchId}`);
     });
 

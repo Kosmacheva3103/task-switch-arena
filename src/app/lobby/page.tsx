@@ -7,6 +7,28 @@ import { connectSocket, getSocket } from '@/lib/socket';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 
+interface PlayerJoinedData {
+  playerId: string;
+  playerName: string;
+  playerCount: number;
+  maxPlayers: number;
+  allPlayers: string[];
+}
+
+interface MatchStartedData {
+  teams: {
+    id: string;
+    name: string;
+    players: {
+      id: string;
+      name: string;
+      rating: number;
+      isBot: boolean;
+    }[];
+  }[];
+  countdown: number;
+}
+
 export default function LobbyPage() {
   const router = useRouter();
   const [matchId, setMatchId] = useState('');
@@ -20,21 +42,19 @@ export default function LobbyPage() {
   useEffect(() => {
     const socket = connectSocket();
 
-    socket.on('player_joined', (data: any) => {
+    socket.on('player_joined', (data: PlayerJoinedData) => {
       if (data.allPlayers) {
         setPlayers(data.allPlayers);
       }
     });
-     socket.on('match_started', (data: any) => {
-    router.push(`/game/${matchId}`);
-  });
 
+    socket.on('match_started', () => {
+      router.push(`/game/${matchId}`);
+    });
 
     return () => {
-      socket.off('connect');
       socket.off('player_joined');
       socket.off('match_started');
-      socket.off('disconnect');
     };
   }, [matchId, router]);
 
@@ -98,7 +118,7 @@ export default function LobbyPage() {
 
   const copyCode = () => {
     const code = createdCode || matchId;
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(code).catch(() => {});
     alert('Код скопирован!');
   };
 

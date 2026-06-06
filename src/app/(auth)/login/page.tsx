@@ -27,8 +27,8 @@ export default function LoginPage() {
       } else {
         router.push('/lobby');
       }
-    } catch (err: any) {
-      setError(err.message || 'Ошибка');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка');
     } finally {
       setLoading(false);
     }
