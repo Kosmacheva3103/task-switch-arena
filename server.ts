@@ -4,8 +4,9 @@ import { parse } from 'url';
 import next from 'next';
 import { Server as SocketIOServer } from 'socket.io';
 import { matchManager } from './src/server/game/matchManager';
-import type { Rule } from './src/server/game/types';
 import { getRuleDisplayName, getRuleButtons } from './src/server/game/rules';
+import type { Rule } from './src/server/game/types';
+
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = 3000;
@@ -30,26 +31,55 @@ app.prepare().then(() => {
   });
 
   io.on('connection', (socket) => {
-    socket.on('join_match', (data: { matchId: string; playerId: string; playerName: string }) => {
-      const { matchId, playerId, playerName } = data;
+    socket.on('join_match', (data: { matchId: string; playerId: string; playerName: string; userId?: string; action?: string }) => {
+      const { matchId, playerId, playerName, userId, action } = data;
+        console.log('=== ПОЛУЧЕНО ===');
+  console.log('userId из data:', data.userId);
+  console.log('полный data:', JSON.stringify(data));
+      // Проверка для JOIN: комната существует?
+      if (action === 'join') {
+        const existingMatch = matchManager.getMatch(matchId);
+        if (!existingMatch) {
+          socket.emit('error_message', 'Комната не найдена. Проверьте код.');
+          return;
+        }
+        if (existingMatch.status !== 'waiting') {
+          socket.emit('error_message', 'Игра уже началась.');
+          return;
+        }
+      }
 
-      // Проверка: не присоединился ли уже этот сокет к матчу
-      if (socket.data.matchId === matchId) return;
+      // Проверка по userId
+      if (userId) {
+        if (matchManager.isPlayerInAnyMatch(userId, matchId)) {
+          socket.emit('error_message', 'Вы уже находитесь в другой комнате.');
+          return;
+        }
+
+        const existingMatch = matchManager.getMatch(matchId);
+        if (existingMatch) {
+          const allPlayers = [...existingMatch.teams[0].players, ...existingMatch.teams[1].players];
+          if (allPlayers.some(p => p.userId === userId)) {
+            socket.emit('error_message', 'Вы уже в этой комнате.');
+            return;
+          }
+        }
+      }
 
       socket.join(`match:${matchId}`);
       socket.data.matchId = matchId;
       socket.data.playerId = playerId;
-      
+
       let added = matchManager.addPlayer(matchId, {
         id: playerId, name: playerName, rating: 1000,
-        isBot: false, individualScore: 0, errors: 0,
+        isBot: false, individualScore: 0, errors: 0, userId,
       });
 
       if (!added) {
         matchManager.createMatchById(matchId);
         matchManager.addPlayer(matchId, {
           id: playerId, name: playerName, rating: 1000,
-          isBot: false, individualScore: 0, errors: 0,
+          isBot: false, individualScore: 0, errors: 0, userId,
         });
       }
 

@@ -17,7 +17,25 @@ class MatchManager {
   
   // Ответы игроков в текущем раунде
   private roundAnswers: Map<string, Map<string, { answer: boolean; timeMs: number }>> = new Map();
+  /**
+   * Проверяет, находится ли игрок (по userId) в каком-либо матче
+   */
+  isPlayerInAnyMatch(userId: string, excludeMatchId?: string): boolean {
+    for (const [id, match] of this.matches) {
+      if (id === excludeMatchId) continue;
+      if (match.status !== 'waiting' && match.status !== 'active') continue;
 
+      const allPlayers = [
+        ...match.teams[0].players,
+        ...match.teams[1].players,
+      ];
+
+      if (allPlayers.some(p => (p as any).userId === userId)) {
+        return true;
+      }
+    }
+    return false;
+  }
   /**
    * Создание нового матча
    */

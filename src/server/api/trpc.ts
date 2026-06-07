@@ -4,12 +4,15 @@ import { auth } from '../auth';
 import { headers } from 'next/headers';
 
 export const createTRPCContext = async () => {
-  const headersList = await headers();
-  const session = await auth.api.getSession({
-    headers: headersList,
-  });
-
-  return { session };
+  try {
+    const headersList = await headers();
+    const session = await auth.api.getSession({
+      headers: headersList,
+    });
+    return { session };
+  } catch {
+    return { session: null };
+  }
 };
 
 const t = initTRPC.context<typeof createTRPCContext>().create({
@@ -33,7 +36,6 @@ export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
       message: 'Необходима авторизация',
     });
   }
-
   return next({
     ctx: {
       ...ctx,

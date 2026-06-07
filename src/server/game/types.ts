@@ -9,6 +9,7 @@ export interface Player {
   isBot: boolean;
   individualScore: number;
   errors: number;
+  userId?: string;
 }
 
 // Команда

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { connectSocket, getSocket } from '@/lib/socket';
 import Button from '@/components/ui/Button';
 import Timer from '@/components/ui/Timer';
+import UserMenu from '@/components/ui/UserMenu';
 
 interface GameData {
   rule: string;
@@ -78,8 +79,13 @@ export default function GamePage() {
   const [answerResult, setAnswerResult] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [startTime, setStartTime] = useState(0);
+  const [userName, setUserName] = useState('Игрок');
 
   useEffect(() => {
+    fetch('/api/me')
+      .then(r => r.json())
+      .then(data => { if (data.name) setUserName(data.name); })
+      .catch(() => {});
     const socket = connectSocket();
 
     socket.on('match_started', (data: MatchStartedData) => {
@@ -153,6 +159,9 @@ export default function GamePage() {
 
   return (
     <main className="min-h-screen bg-gray-900 p-4">
+      <div className="flex justify-end mb-4">
+        <UserMenu userName={userName} />
+      </div>
       <div className="flex justify-between items-center mb-4 text-white">
         <div className="text-center">
           <p className="text-sm text-gray-400">{teamA?.name}</p>
