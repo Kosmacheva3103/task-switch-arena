@@ -15,20 +15,6 @@ interface PlayerJoinedData {
   allPlayers: string[];
 }
 
-interface MatchStartedData {
-  teams: {
-    id: string;
-    name: string;
-    players: {
-      id: string;
-      name: string;
-      rating: number;
-      isBot: boolean;
-    }[];
-  }[];
-  countdown: number;
-}
-
 export default function LobbyPage() {
   const router = useRouter();
   const [matchId, setMatchId] = useState('');
@@ -37,6 +23,7 @@ export default function LobbyPage() {
   const [createdCode, setCreatedCode] = useState('');
   const [players, setPlayers] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<'select' | 'create' | 'join' | 'waiting'>('select');
 
   useEffect(() => {
@@ -58,32 +45,28 @@ export default function LobbyPage() {
     };
   }, [matchId, router]);
 
-  const createRoom = () => {
-    if (!playerName.trim()) {
-      setError('Введите имя');
-      return;
-    }
+const createRoom = () => {
+  if (!playerName.trim()) {
+    setError('Введите имя');
+    return;
+  }
 
-    const roomCode = nanoid(8).toUpperCase();
-    const playerId = nanoid();
+  const roomCode = nanoid(8).toUpperCase();
+  const playerId = nanoid();
 
-    setMatchId(roomCode);
-    setCreatedCode(roomCode);
-    setMode('waiting');
+  setMatchId(roomCode);
+  setCreatedCode(roomCode);
+  setMode('waiting');
 
-    localStorage.setItem('playerId', playerId);
-    localStorage.setItem('playerName', playerName);
-    localStorage.setItem('matchId', roomCode);
+  const socket = getSocket();
+  socket.emit('join_match', {
+    matchId: roomCode,
+    playerId,
+    playerName,
+  });
 
-    const socket = getSocket();
-    socket.emit('join_match', {
-      matchId: roomCode,
-      playerId,
-      playerName,
-    });
-
-    setPlayers([playerName]);
-  };
+  setPlayers([playerName]);
+};
 
   const joinRoom = () => {
     if (!playerName.trim() || !joinCode.trim()) {
@@ -92,10 +75,6 @@ export default function LobbyPage() {
     }
 
     const playerId = nanoid();
-
-    localStorage.setItem('playerId', playerId);
-    localStorage.setItem('playerName', playerName);
-    localStorage.setItem('matchId', joinCode);
 
     setMatchId(joinCode);
     setMode('waiting');
@@ -118,8 +97,10 @@ export default function LobbyPage() {
 
   const copyCode = () => {
     const code = createdCode || matchId;
-    navigator.clipboard.writeText(code).catch(() => {});
-    alert('Код скопирован!');
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
   };
 
   return (
@@ -145,11 +126,13 @@ export default function LobbyPage() {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 placeholder="Ваше имя"
-                className="w-full bg-gray-100 px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="form-input"
               />
-              <Button onClick={createRoom} className="w-full">
-                Создать
-              </Button>
+              <div className="mt-4">
+                <Button onClick={createRoom} className="w-full">
+                  Создать
+                </Button>
+              </div>
             </Card>
 
             <Card>
@@ -159,18 +142,20 @@ export default function LobbyPage() {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 placeholder="Ваше имя"
-                className="w-full bg-gray-100 px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="form-input mb-4"
               />
               <input
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="Код комнаты"
-                className="w-full bg-gray-100 px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="form-input"
               />
-              <Button onClick={joinRoom} variant="secondary" className="w-full">
-                Присоединиться
-              </Button>
+              <div className="mt-4">
+                <Button onClick={joinRoom} variant="secondary" className="w-full">
+                  Присоединиться
+                </Button>
+              </div>
             </Card>
           </div>
         )}
@@ -187,7 +172,9 @@ export default function LobbyPage() {
               >
                 {createdCode || matchId}
               </p>
-              <p className="text-gray-400 mt-2 text-sm">Нажмите на код, чтобы скопировать</p>
+              <p className={`mt-2 text-sm ${copied ? 'text-green-500' : 'text-gray-400'}`}>
+                {copied ? '✅ Скопировано!' : 'Нажмите на код, чтобы скопировать'}
+              </p>
             </div>
 
             <h3 className="text-xl font-bold mb-4">Игроки ({players.length}/6)</h3>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { connectSocket } from '@/lib/socket';
 import Button from '@/components/ui/Button';
@@ -27,31 +27,33 @@ interface MatchEndedData {
   teams: TeamResult[];
 }
 
-function getSavedResults(): MatchEndedData | null {
-  if (typeof window === 'undefined') return null;
-  const saved = localStorage.getItem('lastMatchResults');
-  if (!saved) return null;
-  try {
-    return JSON.parse(saved) as MatchEndedData;
-  } catch {
-    return null;
-  }
-}
-
 export default function ResultsPage() {
   const router = useRouter();
-  const [results, setResults] = useState<MatchEndedData | null>(getSavedResults);
+  const [results, setResults] = useState<MatchEndedData | null>(null);
+  const resultsRef = useRef<MatchEndedData | null>(null);
 
   useEffect(() => {
     const socket = connectSocket();
 
     socket.on('match_ended', (data: MatchEndedData) => {
+      resultsRef.current = data;
       setResults(data);
-      localStorage.setItem('lastMatchResults', JSON.stringify(data));
     });
+
+    const timeout = setTimeout(() => {
+      if (!resultsRef.current) {
+        setResults({
+          winner: null,
+          isDraw: true,
+          finalScores: { teamA: 0, teamB: 0 },
+          teams: [],
+        });
+      }
+    }, 5000);
 
     return () => {
       socket.off('match_ended');
+      clearTimeout(timeout);
     };
   }, []);
 
@@ -59,6 +61,20 @@ export default function ResultsPage() {
     return (
       <main className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-white text-2xl">Загрузка результатов...</div>
+      </main>
+    );
+  }
+
+  if (results.teams.length === 0) {
+    return (
+      <main className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="text-6xl mb-4">📊</div>
+          <p className="text-2xl mb-4">Матч завершён</p>
+          <Button onClick={() => router.push('/lobby')} size="lg">
+            Играть ещё
+          </Button>
+        </div>
       </main>
     );
   }
@@ -73,7 +89,7 @@ export default function ResultsPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {results.teams?.map((team, i) => (
+          {results.teams.map((team, i) => (
             <Card key={i}>
               <h3 className="text-xl font-bold text-center mb-4">{team.name}</h3>
               <p className="text-4xl font-bold text-center text-indigo-500 mb-4">
@@ -81,17 +97,12 @@ export default function ResultsPage() {
               </p>
               <div className="space-y-2">
                 {team.players.map((player, j) => (
-                  <div
-                    key={j}
-                    className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg"
-                  >
-                    <span className="font-medium">{player.name}</span>
-                    <span className="text-sm">
+                  <div key={j} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg">
+                    <span className="font-medium text-gray-900">{player.name}</span>
+                    <span className="text-sm text-gray-700">
                       {player.individualScore} очков
                       {player.errors > 0 && (
-                        <span className="text-red-500 ml-2">
-                          ({player.errors} ошибок)
-                        </span>
+                        <span className="text-red-500 ml-2">({player.errors} ошибок)</span>
                       )}
                     </span>
                   </div>

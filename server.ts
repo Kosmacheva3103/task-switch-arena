@@ -5,7 +5,7 @@ import next from 'next';
 import { Server as SocketIOServer } from 'socket.io';
 import { matchManager } from './src/server/game/matchManager';
 import type { Rule } from './src/server/game/types';
-
+import { getRuleDisplayName, getRuleButtons } from './src/server/game/rules';
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = 3000;
@@ -32,10 +32,14 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     socket.on('join_match', (data: { matchId: string; playerId: string; playerName: string }) => {
       const { matchId, playerId, playerName } = data;
+
+      // Проверка: не присоединился ли уже этот сокет к матчу
+      if (socket.data.matchId === matchId) return;
+
       socket.join(`match:${matchId}`);
       socket.data.matchId = matchId;
       socket.data.playerId = playerId;
-
+      
       let added = matchManager.addPlayer(matchId, {
         id: playerId, name: playerName, rating: 1000,
         isBot: false, individualScore: 0, errors: 0,
@@ -111,12 +115,12 @@ function startGameLoop(matchId: string, io: SocketIOServer) {
 
     io.to(`match:${matchId}`).emit('rule_changed', {
       rule: match.currentRule,
-      ruleDisplay: getRuleName(match.currentRule as Rule),
+      ruleDisplay: getRuleDisplayName(match.currentRule as Rule),
       symbol: match.currentSymbol,
       roundNumber: match.roundNumber,
       maxRounds: match.maxRounds,
       timeLimit: duration,
-      buttons: getButtons(match.currentRule as Rule),
+      buttons: getRuleButtons(match.currentRule as Rule),
     });
 
     processBotAnswers(matchId, io);
@@ -179,20 +183,4 @@ function endGame(matchId: string, io: SocketIOServer) {
       })),
     })),
   });
-}
-
-function getRuleName(rule: Rule): string {
-  const names: Record<Rule, string> = {
-    EVEN_ODD: 'Чётное?', VOWEL_CONSONANT: 'Гласная?', MULTIPLE_OF_THREE: 'Кратно 3?',
-  };
-  return names[rule];
-}
-
-function getButtons(rule: Rule): [string, string] {
-  const buttons: Record<Rule, [string, string]> = {
-    EVEN_ODD: ['Чётное', 'Нечётное'],
-    VOWEL_CONSONANT: ['Гласная', 'Согласная'],
-    MULTIPLE_OF_THREE: ['Да', 'Нет'],
-  };
-  return buttons[rule];
 }

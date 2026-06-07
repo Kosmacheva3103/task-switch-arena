@@ -77,6 +77,7 @@ export default function GamePage() {
   const [answered, setAnswered] = useState(false);
   const [answerResult, setAnswerResult] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
+  const [startTime, setStartTime] = useState(0);
 
   useEffect(() => {
     const socket = connectSocket();
@@ -92,6 +93,7 @@ export default function GamePage() {
       setAnswered(false);
       setAnswerResult('');
       setGameStarted(true);
+      setStartTime(Date.now());
     });
 
     socket.on('answer_result', (data: AnswerResultData) => {
@@ -103,8 +105,7 @@ export default function GamePage() {
       setScoreB(data.teamScores.teamB);
     });
 
-    socket.on('match_ended', (data: MatchEndedData) => {
-      localStorage.setItem('lastMatchResults', JSON.stringify(data));
+    socket.on('match_ended', () => {
       router.push(`/results/${matchId}`);
     });
 
@@ -121,11 +122,13 @@ export default function GamePage() {
     if (answered) return;
     setAnswered(true);
 
+    const responseTimeMs = Date.now() - startTime;
+
     const socket = getSocket();
     socket.emit('submit_answer', {
       matchId,
       answer,
-      responseTimeMs: 500,
+      responseTimeMs,
     });
   };
 
