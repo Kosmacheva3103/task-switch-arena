@@ -1,4 +1,5 @@
 import { createServer } from 'http';
+import Database from 'better-sqlite3';
 import 'dotenv/config';
 import { parse } from 'url';
 import next from 'next';
@@ -70,7 +71,7 @@ app.prepare().then(() => {
       socket.data.matchId = matchId;
       socket.data.playerId = playerId;
 
-      let added = matchManager.addPlayer(matchId, {
+      const added = matchManager.addPlayer(matchId, {
         id: playerId, name: playerName, rating: 1000,
         isBot: false, individualScore: 0, errors: 0, userId,
       });
@@ -115,8 +116,11 @@ app.prepare().then(() => {
     socket.on('submit_answer', (data: { matchId: string; answer: boolean; responseTimeMs: number }) => {
       const result = matchManager.submitAnswer(data.matchId, socket.data.playerId, data.answer, data.responseTimeMs);
       socket.emit('answer_result', {
-        accepted: result.accepted, correct: result.correct,
-        points: result.points, message: result.message,
+        accepted: result.accepted,
+        correct: result.correct,
+        points: result.points,
+        message: result.message,
+        responseTimeMs: data.responseTimeMs,
       });
     });
 
@@ -197,7 +201,27 @@ function endGame(matchId: string, io: SocketIOServer) {
   matchManager.endMatch(matchId);
   const match = matchManager.getMatch(matchId);
   const winner = matchManager.getWinner(matchId);
-  io.to(`match:${matchId}`).emit('match_ended', {
+  const ratingChanges = matchManager.calculateRatingChanges(matchId);
+
+  // Обновляем рейтинг игроков
+  if (match && ratingChanges) {
+    const db = new Database('auth.db');
+
+    for (const team of match.teams) {
+      const isTeamA = team.id === 'team_a';
+      const delta = isTeamA ? ratingChanges.teamA : ratingChanges.teamB;
+
+      for (const player of team.players) {
+        if (!player.isBot && player.userId) {
+          // Обновляем рейтинг в БД
+          db.prepare('UPDATE user SET rating = rating + ? WHERE id = ?').run(delta, player.userId);
+        }
+      }
+    }
+    db.close();
+  }
+
+  const results = {
     winner: winner ? { id: winner.id, name: winner.name } : null,
     isDraw: !winner,
     finalScores: {
@@ -212,5 +236,8 @@ function endGame(matchId: string, io: SocketIOServer) {
         errors: p.errors,
       })),
     })),
-  });
+    ratingChanges: ratingChanges || { teamA: 0, teamB: 0 },
+  };
+
+  io.to(`match:${matchId}`).emit('match_ended', results);
 }

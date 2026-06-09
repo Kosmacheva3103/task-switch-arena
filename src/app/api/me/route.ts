@@ -35,6 +35,7 @@ export async function GET() {
       userId: user.id,
       name: user.name,
       email: user.email,
+      rating: user.rating || 1000,
     });
   } catch (err) {
     return NextResponse.json({ userId: null, name: null });

@@ -1,8 +1,8 @@
 import { nanoid } from 'nanoid';
 import type { GameState, Player, Team, RoundResult, Rule } from './types';
 import { generateSymbol, checkAnswer, getRuleDisplayName } from './rules';
-import { calculateRoundScore, getTeamPenalty } from './scoring';
 import { calculateEloChange, calculateTeamRating } from './rating';
+import { calculateRoundScore, getTeamPenalty, getNoAnswerPenalty } from './scoring';
 
 /**
  * MatchManager — центральный класс управления игровыми матчами
@@ -30,7 +30,7 @@ class MatchManager {
         ...match.teams[1].players,
       ];
 
-      if (allPlayers.some(p => (p as any).userId === userId)) {
+      if (allPlayers.some(p => p.userId === userId)) {
         return true;
       }
     }
@@ -191,35 +191,52 @@ class MatchManager {
    * Заполнение команд ботами до 6 игроков
    */
   private fillWithBots(match: GameState): void {
-    const totalPlayers = match.teams[0].players.length + match.teams[1].players.length;
-    const botsNeeded = 6 - totalPlayers;
-    
-    const botConfigs = [
-      { name: 'Бот Лёгкий', minRating: 800, maxRating: 1000, accuracy: 0.60, minTime: 1000, maxTime: 2500 },
-      { name: 'Бот Средний', minRating: 1100, maxRating: 1300, accuracy: 0.75, minTime: 600, maxTime: 1800 },
-      { name: 'Бот Сложный', minRating: 1400, maxRating: 1600, accuracy: 0.88, minTime: 300, maxTime: 1200 },
-    ];
-    
-    for (let i = 0; i < botsNeeded; i++) {
-      const config = botConfigs[i % botConfigs.length];
-      
-      const bot: Player = {
-        id: `bot_${nanoid(8)}`,
-        name: config.name,
-        rating: config.minRating + Math.floor(Math.random() * (config.maxRating - config.minRating)),
-        isBot: true,
-        individualScore: 0,
-        errors: 0,
-      };
-      
-      // Добавляем бота в команду с меньшим количеством игроков
-      if (match.teams[0].players.length <= match.teams[1].players.length) {
-        match.teams[0].players.push(bot);
-      } else {
-        match.teams[1].players.push(bot);
-      }
+  const totalPlayers = match.teams[0].players.length + match.teams[1].players.length;
+  const botsNeeded = 6 - totalPlayers;
+
+  const allRealPlayers = [...match.teams[0].players, ...match.teams[1].players]
+    .filter(p => !p.isBot);
+  const avgRating = allRealPlayers.length > 0
+    ? Math.round(allRealPlayers.reduce((s, p) => s + p.rating, 0) / allRealPlayers.length)
+    : 1000;
+
+  for (let i = 0; i < botsNeeded; i++) {
+    const botRating = avgRating + Math.floor((Math.random() - 0.5) * 200);
+    let accuracy: number;
+    let minTime: number;
+    let maxTime: number;
+    let name: string;
+
+    if (botRating < 1000) {
+      accuracy = 0.55 + Math.random() * 0.15;
+      minTime = 1000; maxTime = 2500;
+      name = 'Бот Лёгкий';
+    } else if (botRating < 1300) {
+      accuracy = 0.65 + Math.random() * 0.15;
+      minTime = 600; maxTime = 1800;
+      name = 'Бот Средний';
+    } else {
+      accuracy = 0.80 + Math.random() * 0.12;
+      minTime = 300; maxTime = 1200;
+      name = 'Бот Сложный';
+    }
+
+    const bot: Player = {
+      id: `bot_${nanoid(8)}`,
+      name,
+      rating: botRating,
+      isBot: true,
+      individualScore: 0,
+      errors: 0,
+    };
+
+    if (match.teams[0].players.length <= match.teams[1].players.length) {
+      match.teams[0].players.push(bot);
+    } else {
+      match.teams[1].players.push(bot);
     }
   }
+}
 
   /**
    * Переход к следующему раунду
@@ -227,7 +244,33 @@ class MatchManager {
   nextRound(matchId: string): GameState | null {
     const match = this.matches.get(matchId);
     if (!match || match.status !== 'active') return null;
-    
+
+  // Штрафуем игроков, которые не ответили в прошлом раунде
+  if (match.roundNumber > 0) {
+    const answers = this.roundAnswers.get(matchId);
+    if (answers) {
+      for (const team of match.teams) {
+        for (const player of team.players) {
+          if (!answers.has(player.id) && !player.isBot) {
+            player.errors++;
+            team.totalScore += getNoAnswerPenalty();
+
+            match.roundResults.push({
+              playerId: player.id,
+              playerName: player.name,
+              symbol: match.currentSymbol || '',
+              playerAnswer: null,
+              correctAnswer: false,
+              wasCorrect: false,
+              points: getNoAnswerPenalty(),
+              responseTimeMs: 0,
+            });
+          }
+        }
+      }
+    }
+  }
+
     match.roundNumber++;
     
     // Проверка завершения матча

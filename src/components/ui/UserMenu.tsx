@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 
 interface UserMenuProps {
   userName: string;
+  rating?: number;
 }
 
-export default function UserMenu({ userName }: UserMenuProps) {
+export default function UserMenu({ userName, rating }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -25,14 +26,22 @@ export default function UserMenu({ userName }: UserMenuProps) {
       >
         <span className="text-lg">👤</span>
         <span>{userName}</span>
+        {rating !== undefined && (
+          <span className="text-yellow-300 text-sm">🏆 {rating}</span>
+        )}
         <span className="text-xs">▼</span>
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-2 bg-white rounded-xl shadow-lg py-2 w-48 z-50">
-            <div className="px-4 py-2 text-gray-500 text-sm border-b">{userName}</div>
+          <div className="absolute right-0 mt-2 bg-white rounded-xl shadow-lg py-2 w-56 z-50">
+            <div className="px-4 py-2 text-gray-500 text-sm border-b">
+              {userName}
+              {rating !== undefined && (
+                <span className="text-yellow-500 ml-2">🏆 {rating}</span>
+              )}
+            </div>
             <button
               onClick={handleLogout}
               className="w-full text-left px-4 py-2 text-red-500 hover:bg-red-50 transition"

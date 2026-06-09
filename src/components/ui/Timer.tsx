@@ -11,7 +11,6 @@ export default function Timer({ seconds, onComplete }: TimerProps) {
   const [timeLeft, setTimeLeft] = useState(seconds);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTimeLeft(seconds);
   }, [seconds]);
 

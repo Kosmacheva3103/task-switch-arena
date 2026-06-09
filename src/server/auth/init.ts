@@ -16,6 +16,7 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     emailVerified INTEGER DEFAULT 0 NOT NULL,
     image TEXT,
+    rating INTEGER DEFAULT 1000 NOT NULL,
     createdAt TEXT DEFAULT (datetime('now')) NOT NULL,
     updatedAt TEXT DEFAULT (datetime('now')) NOT NULL
   );

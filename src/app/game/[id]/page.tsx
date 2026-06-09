@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { getScoreBreakdown } from '@/server/game/scoring';
 import Button from '@/components/ui/Button';
 import Timer from '@/components/ui/Timer';
 import UserMenu from '@/components/ui/UserMenu';
@@ -38,6 +39,7 @@ interface AnswerResultData {
   correct: boolean;
   points: number;
   message?: string;
+  responseTimeMs?: number;
 }
 
 interface RoundResultData {
@@ -103,7 +105,16 @@ export default function GamePage() {
     });
 
     socket.on('answer_result', (data: AnswerResultData) => {
-      setAnswerResult(data.correct ? `✅ +${data.points} очков` : '❌ 0 очков');
+      if (data.correct && data.responseTimeMs) {
+        const breakdown = getScoreBreakdown(data.responseTimeMs, true);
+        setAnswerResult(`✅ +${data.points} очков (база: ${breakdown.basePoints} + бонус: ${breakdown.timeBonus})`);
+      } else if (data.points < 0) {
+        setAnswerResult(`⚠️ ${data.points} очков (штраф)`);
+      } else if (data.correct) {
+        setAnswerResult(`✅ +${data.points} очков`);
+      } else {
+        setAnswerResult('❌ 0 очков');
+      }
     });
 
     socket.on('round_result', (data: RoundResultData) => {
@@ -111,10 +122,10 @@ export default function GamePage() {
       setScoreB(data.teamScores.teamB);
     });
 
-    socket.on('match_ended', () => {
+    socket.on('match_ended', (data: MatchEndedData) => {
+      sessionStorage.setItem('matchResults', JSON.stringify(data));
       router.push(`/results/${matchId}`);
     });
-
     return () => {
       socket.off('match_started');
       socket.off('rule_changed');

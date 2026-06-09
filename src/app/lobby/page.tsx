@@ -38,18 +38,22 @@ export default function LobbyPage() {
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<'select' | 'create' | 'join' | 'waiting'>('select');
   const [userName, setUserName] = useState('Гость');
+  const [rating, setRating] = useState<number | undefined>(undefined);
 
-  useEffect(() => {
-    fetch('/api/me')
-      .then(r => r.json())
-      .then(data => {
-        if (data.userId && data.name) {
-          setUserName(data.name);
-          setPlayerName(data.name);
-        }
-      })
-      .catch(() => {});
-  }, []);
+useEffect(() => {
+  fetch('/api/me')
+    .then(r => r.json())
+    .then(data => {
+      if (data.name) {
+        setUserName(data.name);
+        setPlayerName(data.name);
+      }
+      if (data.rating !== undefined) {
+        setRating(data.rating);
+      }
+    })
+    .catch(() => {});
+}, []);
 
   useEffect(() => {
     const socket = connectSocket();
@@ -140,7 +144,7 @@ export default function LobbyPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold text-white">🎮 Лобби</h1>
-          <UserMenu userName={userName} />
+          <UserMenu userName={userName} rating={rating} />
         </div>
 
         {error && (
